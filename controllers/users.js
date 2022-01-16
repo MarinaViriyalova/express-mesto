@@ -41,7 +41,7 @@ const updateUser = (req, res) => {
     const { name, about } = req.body;
 
     User
-        .findByIdAndUpdate(req.user._id, { name, about }, { new: true })
+        .findByIdAndUpdate(req.user._id, { name, about }, { new: true, runValidators: true })
         .orFail(() => { throw new Error('Профиль не найден'); })
         .then(({
             name,
@@ -72,7 +72,7 @@ const updateUserAvatar = (req, res) => {
     const { _id } = req.user;
 
     return User
-        .findByIdAndUpdate(_id, { avatar }, { new: true })
+        .findByIdAndUpdate(_id, { avatar }, { new: true, runValidators: true })
         .orFail(() => { throw new Error('Аватар не найден'); })
         .then(({
             name,

@@ -45,7 +45,7 @@ const likeCard = (req, res) => {
 
 const deleteCard = (req, res) => {
     Card.findByIdAndRemove(req.params.id)
-        .orFail(() => { throw new Error('Не возможно удалить карточку - ошибка 404'); })
+        .orFail(() => { throw new Error('Не возможно удалить карточку'); })
         .then((card) => res.status(200).send(card))
         .catch((err) => {
             if (err.message === 'Не возможно удалить карточку - ошибка 404') {
@@ -60,7 +60,7 @@ const deleteCard = (req, res) => {
 
 const dislikeCard = (req, res) => {
     Card.findByIdAndUpdate(req.params.id, { $pull: { likes: req.user._id } }, { new: true })
-        .orFail(() => { throw new Error('Не возможно удалить like - ошибка 404'); })
+        .orFail(() => { throw new Error('Не возможно удалить like'); })
         .then((card) => res.status(200).send(card))
         .catch((err) => {
             if (err.message === 'Не возможно удалить лайк - ошибка 404') {
