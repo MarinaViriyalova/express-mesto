@@ -1,107 +1,210 @@
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 
-const getUsers = (req, res) => User.find({})
-  .then((users) => {
-    res.status(200).send(users);
-  })
-  .catch(() => res.status(500).send({ message: 'Произошла ошибка' }));
+const {
+    NODE_ENV,
+    JWT_SECRET,
+} = process.env;
 
-const getUser = (req, res) => {
-  const { _id } = req.params;
-  return User
-    .findById(_id)
-    .orFail(() => { throw new Error('Нет пользователя с таким _id'); })
-    .then((user) => res.status(200).send({ user }))
-    .catch((err) => {
-      if (err.message === 'Нет пользователя с таким _id') {
-        res.status(404).send({ message: 'Нет пользователя с таким _id' });
-      } else if (err.name === 'CastError') {
-        res.status(400).send({ message: 'Ошибка в ID пользователя' });
-      } else {
-        res.status(500).send({ message: 'Произошла ошибка' });
-      }
-    });
-};
-
-const createUser = (req, res) => {
-  console.log(req.body);
-  return User
-    .create({ ...req.body })
-    .then((user) => res.status(201).send(user))
-    .catch((err) => {
-      if (err.name === 'ValidationError') {
-        res.status(400).send({ message: 'Некорректные данные при создании пользователя.' });
-      } else {
-        res.status(500).send({ message: 'Произошла ошибка' });
-      }
-    });
-};
-
-const updateUser = (req, res) => {
-  const { name, about } = req.body;
-
-  User
-    .findByIdAndUpdate(req.user._id, { name, about }, { new: true, runValidators: true })
-    .orFail(() => { throw new Error('Профиль не найден'); })
-    .then(({
-      name,
-      about,
-      avatar,
-      _id,
-    }) => {
-      res.status(200).send({
+module.exports.createUser = (req, res, next) => {
+    const {
         name,
         about,
         avatar,
-        _id,
-      });
-    })
-    .catch((err) => {
-      if (err.name === 'ValidationError' || err.name === 'CastError') {
-        res.status(400).send({ message: 'Некорректные данные при обновлении профиля.' });
-      } else if (err.message === 'Профиль не найден') {
-        res.status(404).send({ message: 'Профиль не найден' });
-      } else {
-        res.status(500).send({ message: 'Произошла ошибка' });
-      }
-    });
+        email,
+        password,
+    } = req.body;
+
+    bcrypt.hash(password, 10)
+        .then((hash) => User.create({
+            name,
+            about,
+            avatar,
+            email,
+            password: hash,
+        }))
+        .then(() => res.send({
+            data: {
+                name,
+                about,
+                avatar,
+                email,
+            },
+        }))
+        .catch((err) => {
+            if (err.name === 'ValidationError') {
+                const e = new Error('Некорректные данные при создании карточек');
+                e.statusCode = 400;
+                next(e);
+            } else if (err.code === 11000) {
+                const e = new Error('Пользователь уже зарегистрирован');
+                e.statusCode = 409;
+                next(e);
+            } else {
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
+            }
+        });
 };
 
-const updateUserAvatar = (req, res) => {
-  const { avatar } = req.body;
-  const { _id } = req.user;
+module.exports.getUsers = (req, res, next) => {
+    User.find({})
+        .then((user) => res.send({
+            data: user,
+        }))
+        .catch((err) => {
+            const e = new Error(err.message);
+            e.statusCode = 404;
+            next(e);
+        });
+};
 
-  return User
-    .findByIdAndUpdate(_id, { avatar }, { new: true, runValidators: true })
-    .orFail(() => { throw new Error('Аватар не найден'); })
-    .then(({
-      name,
-      about,
-      avatar,
-      _id,
-    }) => {
-      res.status(200).send({
+module.exports.getUserById = (req, res, next) => {
+    User.findById(req.params.userid)
+        .orFail(() => {
+            const e = new Error('Запись не найдена');
+            e.statusCode = 404;
+            next(e);
+        })
+        .then((user) => {
+            res.send({
+                data: user,
+            });
+        })
+        .catch((err) => {
+            if (err.name === 'CastError') {
+                const e = new Error('Нет пользователя с таким _id');
+                e.statusCode = 400;
+                next(e);
+            } else {
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
+            }
+        });
+};
+
+module.exports.getUserProfile = (req, res, next) => {
+    User.findById(req.user._id)
+        .orFail(() => {
+            const e = new Error('Запись не найдена');
+            e.statusCode = 404;
+            next(e);
+        })
+        .then((user) => {
+            res.send({
+                data: user,
+            });
+        })
+        .catch((err) => {
+            if (err.name === 'CastError') {
+                const e = new Error('Нет пользователя с таким _id');
+                e.statusCode = 400;
+                next(e);
+            } else {
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
+            }
+        });
+};
+
+module.exports.updateAvatar = (req, res, next) => {
+    const {
+        avatar,
+    } = req.body;
+
+    User.findByIdAndUpdate(req.user._id, {
+            avatar,
+        }, {
+            new: true,
+            runValidators: true,
+        })
+        .then((avatarLink) => {
+            res.send({
+                data: avatarLink,
+            });
+        })
+        .catch((err) => {
+            if (err.name === 'ValidationError') {
+                const e = new Error(err);
+                e.statusCode = 400;
+                next(e);
+            } else {
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
+            }
+        });
+};
+
+module.exports.updateUserProfile = (req, res, next) => {
+    const {
         name,
         about,
-        avatar,
-        _id,
-      });
-    })
-    .catch((err) => {
-      if (err.name === 'ValidationError' || err.name === 'CastError') {
-        res.status(400).send({ message: 'Некорректные данные при обновлении аватара.' });
-      } else if (err.message === 'Аватар не найден') {
-        res.status(404).send({ message: 'Аватар не найден' });
-      } else {
-        res.status(500).send({ message: 'Произошла ошибка' });
-      }
-    });
+    } = req.body;
+    User.findByIdAndUpdate(req.user._id, {
+            name,
+            about,
+        }, {
+            new: true,
+            runValidators: true,
+        })
+        .then((data) => {
+            res.send({
+                data,
+            });
+        })
+        .catch((err) => {
+            if (err.name === 'ValidationError') {
+                const e = new Error('Некорректные данные');
+                e.statusCode = 400;
+                next(e);
+            } else {
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
+            }
+        });
 };
 
-module.exports = {
-  getUsers,
-  getUser,
-  createUser,
-  updateUser,
-  updateUserAvatar,
+module.exports.login = (req, res, next) => {
+    const {
+        email,
+        password,
+    } = req.body;
+    User.findOne({
+            email,
+        }).select('+password')
+        .then((user) => {
+            if (!user) {
+                return Promise.reject(new Error('Неправильные почта или пароль'));
+            }
+            req.user = user;
+
+            return bcrypt.compare(password, user.password);
+        })
+        .then((matched) => {
+            if (!matched) {
+                return Promise.reject(new Error('Неправильные почта или пароль'));
+            }
+            const token = jwt.sign({
+                _id: req.user._id,
+            }, NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret');
+            res.cookie('jwt', token, {
+                    maxAge: 7 * 24 * 60 * 60,
+                    httpOnly: true,
+                })
+                .end();
+
+            return res.send('cocked');
+        })
+        .catch((err) => {
+            const e = new Error(err.message);
+            e.statusCode = 401;
+
+            next(e);
+        });
 };

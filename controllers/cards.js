@@ -1,80 +1,145 @@
 const Card = require('../models/card');
 
-const getCards = (req, res) => {
-    const { cardsList } = {};
-    return Card.find(cardsList)
-        .then((card) => res.status(200).send(card))
+module.exports.createCard = (req, res, next) => {
+    const {
+        name,
+        link,
+        likes,
+        createdAt,
+    } = req.body;
+    const owner = req.user._id;
+
+    Card.create({
+            name,
+            link,
+            owner,
+            likes,
+            createdAt,
+        })
+        .then((card) => res.send({
+            data: card,
+        }))
         .catch((err) => {
             if (err.name === 'ValidationError') {
-                res.status(400).send({ message: 'Некорректные данные при получении карточек.' });
+                const e = new Error('Некорректные данные при создании карточек');
+                e.statusCode = 400;
+                next(e);
             } else {
-                res.status(500).send({ message: 'Произошла ошибка' });
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
             }
         });
 };
 
-const createCard = (req, res) => {
-    const { name, link } = req.body;
-    return Card.create({ name, link, owner: req.user._id })
-        .then((card) => res.status(200).send(card))
+module.exports.getCards = (req, res, next) => {
+    Card.find({})
+        .then((cards) => res.send({
+            data: cards,
+        }))
         .catch((err) => {
-            if (err.name === 'ValidationError') {
-                res.status(400).send({ message: 'Некорректные данные при создании карточки.' });
-            } else {
-                res.status(500).send({ message: 'Произошла ошибка' });
-            }
+            const e = new Error(err.message);
+            e.statusCode = 500;
+            next(e);
         });
 };
 
-const likeCard = (req, res) => {
-    Card.findByIdAndUpdate(req.params.id, { $addToSet: { likes: req.user._id } }, { new: true })
-        .orFail(() => { throw new Error('Не возможно поставить like'); })
-        .then((card) => res.status(200).send(card))
+module.exports.delCardByid = (req, res, next) => {
+    Card.findOne({
+            _id: req.params.cardId,
+        })
+        .orFail(() => {
+            const e = new Error('Запись не найдена');
+            e.statusCode = 404;
+            next(e);
+        })
+        .then((card) => {
+            if (card.owner.equals(req.user._id)) {
+                Card.deleteOne({
+                        _id: req.params.cardId,
+                    })
+                    .then((data) => {
+                        res.send({
+                            data,
+                        });
+                    });
+            } else {
+                const e = new Error('Запрещено');
+                e.statusCode = 403;
+                next(e);
+            }
+        })
         .catch((err) => {
-            if (err.message === 'Не возможно поставить like') {
-                res.status(404).send({ message: 'Не возможно поставить like - ошибка 404' });
-            } else if (err.name === 'CastError') {
-                res.status(400).send({ message: 'Не возможно поставить like - ошибка 400' });
+            if (err.name === 'CastError') {
+                const e = new Error('Не возможно удалить карточку');
+                e.statusCode = 400;
+                next(e);
             } else {
-                res.status(500).send({ message: 'Произошла ошибка сервера' });
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
             }
         });
 };
 
-const deleteCard = (req, res) => {
-    Card.findByIdAndRemove(req.params.id)
-        .orFail(() => { throw new Error('Не возможно удалить карточку'); })
-        .then((card) => res.status(200).send(card))
+module.exports.likeCard = (req, res, next) => {
+    Card.findByIdAndUpdate(req.params.cardId, {
+            $addToSet: {
+                likes: req.user._id,
+            },
+        }, {
+            new: true,
+        })
+        .orFail(() => {
+            const e = new Error('Запись не найдена');
+            e.statusCode = 404;
+            next(e);
+        })
+        .then((likes) => {
+            res.send({
+                data: likes,
+            });
+        })
         .catch((err) => {
-            if (err.message === 'Не возможно удалить карточку') {
-                res.status(404).send({ message: 'Не возможно удалить карточку - ошибка 404' });
-            } else if (err.name === 'CastError') {
-                res.status(400).send({ message: 'Не возможно удалить карточку - ошибка 400' });
+            if (err.name === 'CastError') {
+                const e = new Error('Не возможно поставить like');
+                e.statusCode = 400;
+                next(e);
             } else {
-                res.status(500).send({ message: 'Произошла ошибка сервера' });
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
             }
         });
 };
 
-const dislikeCard = (req, res) => {
-    Card.findByIdAndUpdate(req.params.id, { $pull: { likes: req.user._id } }, { new: true })
-        .orFail(() => { throw new Error('Не возможно удалить like'); })
-        .then((card) => res.status(200).send(card))
+module.exports.dislikeCard = (req, res, next) => {
+    Card.findByIdAndUpdate(req.params.cardId, {
+            $pull: {
+                likes: req.user._id,
+            },
+        }, {
+            new: true,
+        })
+        .orFail(() => {
+            const e = new Error('Запись не найдена');
+            e.statusCode = 404;
+            next(e);
+        })
+        .then((likes) => {
+            res.send({
+                data: likes,
+            });
+        })
         .catch((err) => {
-            if (err.message === 'Не возможно удалить like') {
-                res.status(404).send({ message: 'Не возможно удалить like - ошибка 404' });
-            } else if (err.name === 'CastError') {
-                res.status(400).send({ message: 'Не возможно удалить like - ошибка 400' });
+            if (err.name === 'CastError') {
+                const e = new Error('Не возможно удалить like');
+                e.statusCode = 400;
+                next(e);
             } else {
-                res.status(500).send({ message: 'Произошла ошибка сервера' });
+                const e = new Error('Произошла ошибка');
+                e.statusCode = 500;
+                next(e);
             }
         });
-};
-
-module.exports = {
-    getCards,
-    createCard,
-    likeCard,
-    deleteCard,
-    dislikeCard,
 };
