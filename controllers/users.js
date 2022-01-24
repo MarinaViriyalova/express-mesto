@@ -183,7 +183,6 @@ module.exports.login = (req, res, next) => {
                 return Promise.reject(new Error('Неправильные почта или пароль'));
             }
             req.user = user;
-
             return bcrypt.compare(password, user.password);
         })
         .then((matched) => {
@@ -196,15 +195,9 @@ module.exports.login = (req, res, next) => {
             res.cookie('jwt', token, {
                     maxAge: 7 * 24 * 60 * 60,
                     httpOnly: true,
+                    sameSite: true,
                 })
-                .end();
-
-
+                .send({ message: 'Вы успешно авторизировались!' });
         })
-        .catch((err) => {
-            const e = new Error(err.message);
-            e.statusCode = 500;
-
-            next(e);
-        });
+        .catch(next);
 };
