@@ -200,8 +200,7 @@ module.exports.login = (req, res, next) => {
         })
         .catch((err) => {
             const e = new Error(err.message);
-            e.statusCode = 500;
-
+            e.statusCode = 401;
             next(e);
         });
 };
