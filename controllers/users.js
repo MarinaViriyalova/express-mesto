@@ -199,11 +199,11 @@ module.exports.login = (req, res, next) => {
                 })
                 .end();
 
-            return res.send('cocked');
+
         })
         .catch((err) => {
             const e = new Error(err.message);
-            e.statusCode = 401;
+            e.statusCode = 500;
 
             next(e);
         });
